@@ -1,0 +1,20 @@
+build/
+# Compiled binaries (Odin names the executable after the directory)
+RayOdin
+RayOdin.exe
+*.exe
+*.bin
+
+# Debug artifacts
+*.pdb
+*.obj
+*.o
+*.exp
+*.lib
+*.dSYM/
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
