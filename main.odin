@@ -1,5 +1,6 @@
 package main
 
+import "core:math/linalg"
 import "core:math"
 import "core:fmt"
 import rl "vendor:raylib"
@@ -109,10 +110,16 @@ update :: proc(g: ^Game, i: Input, dt: f32) {
 	}
 	if b.pos.x > WINDOW_WIDTH || b.pos.x < 0 do reset_ball(b)
 
-	collision1 := rl.CheckCollisionCircleRec(b.pos, b.radius, rl.Rectangle{p1.pos.x, p1.pos.y, p1.size.x, p1.size.y})
-	collision2 := rl.CheckCollisionCircleRec(b.pos, b.radius, rl.Rectangle{p2.pos.x, p2.pos.y, p2.size.x, p2.size.y})
-	if collision1 || collision2 {
-		b.speed.x *= -1.05
+	p1_rect := rl.Rectangle{p1.pos.x, p1.pos.y, p1.size.x, p1.size.y}
+	p2_rect := rl.Rectangle{p2.pos.x, p2.pos.y, p2.size.x, p2.size.y}
+
+	collision1 := rl.CheckCollisionCircleRec(b.pos, b.radius, p1_rect)
+	collision2 := rl.CheckCollisionCircleRec(b.pos, b.radius, p2_rect)
+
+	if b.speed.x < 0 && collision1 {
+		bounce_ball(p1^, b, 1)
+	} else if b.speed.x > 0 && collision2 {
+		bounce_ball(p2^, b, -1)
 	}
 }
 
@@ -153,4 +160,17 @@ move_player :: proc(p: ^Paddle, mov: f32, speed: f32, dt: f32) {
 	if mov != 0 do p.pos.y += speed * dt * mov
 	if p.pos.y < 0 do p.pos.y = 0
 	if p.pos.y + p.size.y > WINDOW_HEIGHT do p.pos.y = WINDOW_HEIGHT - p.size.y
+}
+
+bounce_ball :: proc(p: Paddle, b: ^Ball, dir: f32) {
+	center := p.pos.y + p.size.y / 2
+	offset := (b.pos.y - center) / (p.size.y / 2)
+	offset = clamp(offset, -1, 1)
+
+	angle := offset * MAX_BOUNCE_ANGLE
+	speed := min(linalg.length(b.speed) * BALL_SPEED_GAIN, BALL_SPEED_MAX)
+
+	b.speed = {dir * speed * math.cos(angle), speed * math.sin(angle)}
+
+	b.pos.x = dir > 0 ? p.pos.x + p.size.x + b.radius : p.pos.x - b.radius
 }
