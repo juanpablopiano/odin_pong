@@ -36,7 +36,8 @@ Game :: struct {
 	player2: Paddle,
 	ball: Ball,
 	speed: f32,
-	score: rl.Vector2,
+	score: [2]int,
+	serve_timer: f32,
 }
 
 main :: proc() {
@@ -61,11 +62,14 @@ main :: proc() {
 			color = rl.WHITE,
 		},
 		speed = 400,
+		serve_timer = 1,
 	}
 
-	reset_ball(&game.ball)
+	reset_ball(&game.ball, 1)
 
 	for !rl.WindowShouldClose() {
+		defer free_all(context.temp_allocator)
+
 		dt := min(rl.GetFrameTime(), 0.05)
 
 		input := read_input()
@@ -99,16 +103,26 @@ update :: proc(g: ^Game, i: Input, dt: f32) {
 	move_player(p1, i.move1, g.speed, dt)
 	move_player(p2, i.move2, g.speed, dt)
 
+	if g.serve_timer > 0 {
+		g.serve_timer -= dt
+		return
+	}
+
 	b.pos.y += b.speed.y * dt
 	b.pos.x += b.speed.x * dt
 
 	if b.pos.y < b.radius || b.pos.y > WINDOW_HEIGHT - b.radius do b.speed.y *= -1
-	if b.pos.x >= WINDOW_WIDTH {
+	if b.pos.x > WINDOW_WIDTH {
 		g.score.x += 1
-	} else if b.pos.x <= 0 {
+		reset_ball(b, 1)
+		g.serve_timer = 1
+		return
+	} else if b.pos.x < 0 {
 		g.score.y += 1
+		reset_ball(b, -1)
+		g.serve_timer = 1
+		return
 	}
-	if b.pos.x > WINDOW_WIDTH || b.pos.x < 0 do reset_ball(b)
 
 	p1_rect := rl.Rectangle{p1.pos.x, p1.pos.y, p1.size.x, p1.size.y}
 	p2_rect := rl.Rectangle{p2.pos.x, p2.pos.y, p2.size.x, p2.size.y}
@@ -123,12 +137,16 @@ update :: proc(g: ^Game, i: Input, dt: f32) {
 	}
 }
 
-reset_ball :: proc(b: ^Ball) {
-	speed : f32 = 500
+reset_ball :: proc(b: ^Ball, dir: f32) {
 	b.pos = {WINDOW_WIDTH * 0.5, WINDOW_HEIGHT * 0.5}
+
+	deg := f32(rl.GetRandomValue(10, 30))
+	if rl.GetRandomValue(0, 1) == 0 do deg = -deg
+	angle := deg * math.PI / 180
+
 	b.speed = {
-		rl.GetRandomValue(0, 1) == 1 ? speed : -speed,
-		f32(rl.GetRandomValue(-100, 100)),
+		dir * BALL_SPEED_START * math.cos(angle),
+		BALL_SPEED_START * math.sin(angle),
 	}
 }
 
@@ -147,9 +165,6 @@ draw :: proc(g: Game) {
 
 	rl.DrawText(fmt.ctprint(g.score.x), WINDOW_WIDTH * 0.25, 50, 120, rl.WHITE)
 	rl.DrawText(fmt.ctprint(g.score.y), WINDOW_WIDTH * 0.75, 50, 120, rl.WHITE)
-
-	rl.DrawText(fmt.ctprint(g.ball.speed.x), 50, 50, 40, rl.WHITE)
-	rl.DrawText(fmt.ctprint(g.ball.speed.y), 50, 100, 40, rl.WHITE)
 }
 
 draw_player :: proc(p: Paddle) {
